@@ -1017,3 +1017,40 @@ func normalizeWhiteSpace(s string) string {
 
 	return s
 }
+
+func TestProvisionerPrepare_PowerShellExecutable(t *testing.T) {
+	config := testConfig()
+	config["powershell_exe"] = `C:\pwsh\pwsh.exe`
+
+	var p Provisioner
+	if err := p.Prepare(config); err != nil {
+		t.Fatalf("err: %s", err)
+	}
+
+	expected := `C:\pwsh\pwsh.exe -executionpolicy bypass -file {{.Path}}`
+	if p.config.ExecuteCommand != expected {
+		t.Fatalf("ExecuteCommand = %q, want %q", p.config.ExecuteCommand, expected)
+	}
+	if got := p.PowerShellExecutable(); got != `C:\pwsh\pwsh.exe` {
+		t.Fatalf("PowerShellExecutable() = %q", got)
+	}
+}
+
+func TestProvisionerPowerShellExecutable_precedenceAndQuoting(t *testing.T) {
+	config := testConfig()
+	config["use_pwsh"] = true
+	config["powershell_exe"] = `C:\Program Files\PowerShell\7\pwsh.exe`
+
+	var p Provisioner
+	if err := p.Prepare(config); err != nil {
+		t.Fatalf("err: %s", err)
+	}
+
+	want := `"C:\Program Files\PowerShell\7\pwsh.exe"`
+	if got := p.PowerShellExecutable(); got != want {
+		t.Fatalf("PowerShellExecutable() = %q, want %q", got, want)
+	}
+	if !strings.HasPrefix(p.config.ExecuteCommand, want+" ") {
+		t.Fatalf("ExecuteCommand = %q, want prefix %q", p.config.ExecuteCommand, want)
+	}
+}

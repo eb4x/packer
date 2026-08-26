@@ -119,6 +119,12 @@ type Config struct {
 	// Run pwsh.exe instead of powershell.exe - latest version of powershell.
 	UsePwsh bool `mapstructure:"use_pwsh"`
 
+	// The PowerShell executable that runs the scripts and the elevated
+	// wrapper. Defaults to `powershell`, or `pwsh` when `use_pwsh` is set.
+	// Set a full path when the executable is not on the guest's PATH. A path
+	// with spaces is quoted.
+	PowerShellExecutable string `mapstructure:"powershell_exe"`
+
 	ctx interpolate.Context
 }
 
@@ -128,18 +134,29 @@ type Provisioner struct {
 	generatedData map[string]interface{}
 }
 
+// PowerShellExecutable returns the executable that runs the scripts and,
+// through guestexec.PowerShellExecutableProvisioner, the elevated wrapper.
+func (p *Provisioner) PowerShellExecutable() string {
+	exe := p.config.PowerShellExecutable
+	switch {
+	case exe == "":
+		if p.config.UsePwsh {
+			return "pwsh"
+		}
+		return "powershell"
+	case strings.Contains(exe, " ") && !strings.HasPrefix(exe, `"`):
+		exe = `"` + exe + `"`
+	}
+	return exe
+}
+
 func (p *Provisioner) defaultExecuteCommand() string {
 
 	if p.config.ExecutionPolicy == ExecutionPolicyNone {
 		return `-file {{.Path}}`
 	}
 
-	if p.config.UsePwsh {
-		return fmt.Sprintf(`pwsh -executionpolicy %s -file {{.Path}}`, p.config.ExecutionPolicy)
-	} else {
-		return fmt.Sprintf(`powershell -executionpolicy %s -file {{.Path}}`, p.config.ExecutionPolicy)
-	}
-
+	return fmt.Sprintf(`%s -executionpolicy %s -file {{.Path}}`, p.PowerShellExecutable(), p.config.ExecutionPolicy)
 }
 
 func (p *Provisioner) defaultScriptCommand() string {
@@ -156,12 +173,16 @@ func (p *Provisioner) defaultScriptCommand() string {
 		return baseCmd
 	}
 
-	if p.config.UsePwsh {
-		return fmt.Sprintf(`pwsh -executionpolicy %s -command "%s"`, p.config.ExecutionPolicy, baseCmd)
-	} else {
+	exe := p.PowerShellExecutable()
+	if exe == "powershell" {
+		// The explicit -command below exists because pwsh treats the
+		// trailing argument that goes with no parameter as -File, not
+		// -Command as powershell does. Since powershell reads it as
+		// -Command either way, this could perhaps be collapsed into always
+		// specifying -command.
 		return fmt.Sprintf(`powershell -executionpolicy %s "%s"`, p.config.ExecutionPolicy, baseCmd)
 	}
-
+	return fmt.Sprintf(`%s -executionpolicy %s -command "%s"`, exe, p.config.ExecutionPolicy, baseCmd)
 }
 
 func (p *Provisioner) ConfigSpec() hcldec.ObjectSpec { return p.config.FlatMapstructure().HCL2Spec() }

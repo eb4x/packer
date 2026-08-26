@@ -39,6 +39,7 @@ type FlatConfig struct {
 	DebugMode              *int              `mapstructure:"debug_mode" cty:"debug_mode" hcl:"debug_mode"`
 	PauseAfter             *string           `mapstructure:"pause_after" cty:"pause_after" hcl:"pause_after"`
 	UsePwsh                *bool             `mapstructure:"use_pwsh" cty:"use_pwsh" hcl:"use_pwsh"`
+	PowerShellExecutable   *string           `mapstructure:"powershell_exe" cty:"powershell_exe" hcl:"powershell_exe"`
 }
 
 // FlatMapstructure returns a new FlatConfig.
@@ -82,6 +83,7 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"debug_mode":                 &hcldec.AttrSpec{Name: "debug_mode", Type: cty.Number, Required: false},
 		"pause_after":                &hcldec.AttrSpec{Name: "pause_after", Type: cty.String, Required: false},
 		"use_pwsh":                   &hcldec.AttrSpec{Name: "use_pwsh", Type: cty.Bool, Required: false},
+		"powershell_exe":             &hcldec.AttrSpec{Name: "powershell_exe", Type: cty.String, Required: false},
 	}
 	return s
 }
